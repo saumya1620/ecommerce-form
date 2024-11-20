@@ -3,10 +3,20 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const path = require('path');
+const cloudinary = require('cloudinary').v2;
+const multer = require('multer');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 dotenv.config();
 
 const app = express();
+
+// Cloudinary Configuration
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.CLOUD_API_KEY,
+  api_secret: process.env.CLOUD_API_SECRET,
+});
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -25,18 +35,33 @@ const productSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   description: { type: String, required: true },
   category: { type: String, required: true },
-  imageurl: { type: String, required: true },
+  imageurl: { type: String, required: true },  // Store image URL here
 });
 
 const Product = mongoose.model('Product', productSchema);
+
+// Multer Storage Configuration for Cloudinary
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'ecommerce-products',  // Folder name in Cloudinary
+    allowed_formats: ['jpg', 'jpeg', 'png'],
+  },
+});
+
+const upload = multer({ storage: storage });
 
 // Routes
 app.get('/', (req, res) => {
   res.render('index');
 });
 
-app.post('/submit-product', async (req, res) => {
-  const { name, price, description, category, imageurl } = req.body;
+// Product Submission Route with Image Upload
+app.post('/submit-product', upload.single('image'), async (req, res) => {
+  const { name, price, description, category } = req.body;
+
+  // Get image URL from Cloudinary response
+  const imageurl = req.file ? req.file.path : '';
 
   try {
     const product = new Product({ name, price, description, category, imageurl });
